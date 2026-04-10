@@ -1,0 +1,27 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Test artifacts
+frontend/e2e/results
+
+# Generated / local
+data/
+docs/
+video/
+eshop/
+backend/eshop-map.md
+
+# Coding Agents
+.claude/
+CLAUDE.md

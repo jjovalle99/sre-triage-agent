@@ -1,0 +1,51 @@
+services:
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports: ["6006:6006"]
+    volumes: ["phoenix-data:/data"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006')"]
+      interval: 10s
+      retries: 5
+      start_period: 15s
+    restart: on-failure
+
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    volumes: ["incidents-data:/app/data"]
+    env_file: .env
+    environment:
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
+    depends_on:
+      phoenix:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      retries: 3
+    restart: on-failure
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: on-failure
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  phoenix-data:
+  incidents-data:
