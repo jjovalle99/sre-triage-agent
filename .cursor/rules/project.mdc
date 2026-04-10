@@ -1,0 +1,28 @@
+---
+description: SRE Incident Triage Agent — project conventions
+alwaysApply: true
+---
+# Project: SRE Incident Triage Agent
+
+FastAPI backend (`backend/`) + Next.js frontend (`frontend/`).
+
+## Backend (Python 3.12+)
+- Runtime: `uv run`. Never bare `python`/`pip`/`pytest`.
+- Types: annotate all public functions. Run `uv run ty check` before committing.
+- Lint: `uv run ruff check`. Tests: `uv run pytest` (async, pytest-asyncio auto mode).
+- Key libs: FastAPI, SQLModel/aiosqlite, Mistral SDK, Anthropic/Claude Agent SDK, structlog, stamina.
+
+## Frontend (Next.js + TypeScript)
+- Runtime: `bun`. Never bare `node`/`npm`/`npx`.
+- Lint: `bunx --bun @biomejs/biome check .`. Build: `bun run build`. Tests: `bun test`.
+- No `any`. Strict TypeScript only.
+
+## Both
+- TDD: write a failing test first, then implement.
+- No secrets in code — use `.env` (gitignored).
+- No inline comments that explain WHAT; only non-obvious WHY.
+- YAGNI: build only what's asked.
+
+## Operating the app
+- `docker compose up --build` starts Phoenix (:6006), backend (:8000), frontend (:3000).
+- See `skills/sre-triage/SKILL.md` for API usage: submitting incidents, checking stats, verifying integrations, debugging traces.
