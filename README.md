@@ -2,9 +2,9 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![ty](https://img.shields.io/badge/type%20checked-ty-blue)](https://github.com/astral-sh/ty) [![coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)]() [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org) [![Biome](https://img.shields.io/badge/linted%20with-biome-60a5fa)](https://biomejs.dev) [![Bun](https://img.shields.io/badge/bun-1.3-f472b6)](https://bun.sh)
 
-AI-powered incident triage for the [dotnet/eShop](https://github.com/dotnet/eShop) e-commerce platform. Accepts text, screenshots, and audio. Analyzes the codebase. Creates tickets. Notifies the team.
+[![AgentX Hackathon 2026](https://img.shields.io/badge/SoftServe-AgentX%20Hackathon%202026-6366f1?style=flat-square&logo=rocket&logoColor=white)]()
 
-Built for the SoftServe AgentX Hackathon 2026.
+AI-powered incident triage for the [dotnet/eShop](https://github.com/dotnet/eShop) e-commerce platform. Accepts text, screenshots, and audio. Analyzes the codebase. Creates tickets. Notifies the team.
 
 ## Overview
 
