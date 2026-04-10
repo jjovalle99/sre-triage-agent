@@ -146,7 +146,7 @@ If you missed events from an in-progress or completed incident:
 curl -s -N http://localhost:8000/api/incidents/<incident-id>/stream
 ```
 
-Replays buffered events (up to 50) in order. This is replay-only — no live subscription after replay ends.
+Replays buffered events (up to 50) in order, then closes. Returns 404 if the incident's buffer was cleared (server restart or eviction). This is replay-only — no live subscription after replay ends.
 
 ## For more details
 
