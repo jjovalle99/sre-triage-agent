@@ -74,3 +74,31 @@ async def test_classify_incident_uses_boundary_markers():
     assert "[USER_INPUT_END]" in prompt_content
     assert "my title" in prompt_content
     assert "my desc" in prompt_content
+
+
+async def test_classify_non_403_sdk_error_returns_fallback():
+    import httpx
+    from mistralai.client.errors import SDKError
+
+    client = MagicMock()
+    raw_resp = httpx.Response(status_code=500, text="Internal server error")
+    client.chat.complete_async = AsyncMock(
+        side_effect=SDKError("Server error", raw_response=raw_resp)
+    )
+
+    result = await classify_incident(client, title="test", description="desc")
+
+    assert result.severity == "P2"
+    assert result.category == "other"
+    assert result.guardrails_blocked is False
+
+
+async def test_classify_generic_exception_returns_fallback():
+    client = MagicMock()
+    client.chat.complete_async = AsyncMock(side_effect=ValueError("unexpected"))
+
+    result = await classify_incident(client, title="test", description="desc")
+
+    assert result.severity == "P2"
+    assert result.category == "other"
+    assert result.guardrails_blocked is False

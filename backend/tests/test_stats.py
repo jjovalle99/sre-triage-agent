@@ -65,3 +65,6 @@ async def test_stats_returns_aggregate_data(seeded_client: AsyncClient) -> None:
     assert data["by_status"]["triaged"] == 1
     assert data["by_status"]["resolved"] == 1
     assert data["avg_triage_duration_ms"] > 0
+    assert "resolved_count" in data
+    assert isinstance(data["resolved_count"], int)
+    assert "token_usage" in data

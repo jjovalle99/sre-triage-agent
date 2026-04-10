@@ -142,3 +142,66 @@ async def test_webhook_non_resolution_returns_200(webhook_client: tuple[httpx.As
 
     assert resp.status_code == 200
     assert resp.json()["status"] == "ignored"
+
+
+@pytest.mark.asyncio
+async def test_webhook_replay_returns_401(webhook_client: tuple[httpx.AsyncClient, AsyncSession]) -> None:
+    client, _ = webhook_client
+    payload = _make_payload()
+    payload["webhookTimestamp"] = int((time.time() - 120) * 1000)
+    body = json.dumps(payload).encode()
+    sig = _sign(body, SECRET)
+
+    with patch.dict("os.environ", {"LINEAR_WEBHOOK_SECRET": SECRET}):
+        resp = await client.post(
+            "/api/webhooks/linear",
+            content=body,
+            headers={"Linear-Signature": sig, "Content-Type": "application/json"},
+        )
+
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_webhook_unknown_identifier_ignored(webhook_client: tuple[httpx.AsyncClient, AsyncSession]) -> None:
+    client, _ = webhook_client
+    payload = _make_payload(identifier="UNKNOWN-999")
+    body = json.dumps(payload).encode()
+    sig = _sign(body, SECRET)
+
+    with patch.dict("os.environ", {"LINEAR_WEBHOOK_SECRET": SECRET}):
+        resp = await client.post(
+            "/api/webhooks/linear",
+            content=body,
+            headers={"Linear-Signature": sig, "Content-Type": "application/json"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ignored"
+
+
+@pytest.mark.asyncio
+async def test_webhook_already_resolved(webhook_client: tuple[httpx.AsyncClient, AsyncSession]) -> None:
+    client, _ = webhook_client
+    payload = _make_payload()
+    body = json.dumps(payload).encode()
+    sig = _sign(body, SECRET)
+
+    with patch.dict("os.environ", {"LINEAR_WEBHOOK_SECRET": SECRET}):
+        await client.post(
+            "/api/webhooks/linear",
+            content=body,
+            headers={"Linear-Signature": sig, "Content-Type": "application/json"},
+        )
+
+        payload2 = _make_payload()
+        body2 = json.dumps(payload2).encode()
+        sig2 = _sign(body2, SECRET)
+        resp = await client.post(
+            "/api/webhooks/linear",
+            content=body2,
+            headers={"Linear-Signature": sig2, "Content-Type": "application/json"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "already_resolved"

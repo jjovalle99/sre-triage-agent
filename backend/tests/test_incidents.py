@@ -283,7 +283,7 @@ async def test_post_incident_with_audio_feeds_transcription_to_triage(
 
     from tests.conftest import _AsyncIterFromList, _DEFAULT_TRIAGE
 
-    def _capture_triage(**kwargs):  # type: ignore[no-untyped-def]
+    def _capture_triage(**kwargs: object) -> _AsyncIterFromList:
         triage_mock(**kwargs)
         return _AsyncIterFromList([TriageComplete(result=_DEFAULT_TRIAGE)])
 
@@ -354,3 +354,102 @@ async def test_post_incident_with_transcription_field_uses_text_in_moderation(
 
     call_kwargs = mod_mock.call_args.kwargs
     assert "edited transcription text" in call_kwargs.get("description", "")
+
+
+async def test_post_incident_non_image_file_returns_415(client: httpx.AsyncClient):
+    resp = await client.post(
+        "/api/incidents",
+        data=_F,
+        files=[("image", ("test.wav", b"RIFF" + b"\x00" * 40, "audio/wav"))],
+    )
+    assert resp.status_code == 415
+    assert "not an image" in resp.json()["detail"]["error"]
+
+
+async def test_post_incident_non_log_file_returns_415(client: httpx.AsyncClient):
+    resp = await client.post(
+        "/api/incidents",
+        data=_F,
+        files=[("log_file", ("shot.png", b"\x89PNG\r\n\x1a\nrest", "image/png"))],
+    )
+    assert resp.status_code == 415
+    assert "not a text log" in resp.json()["detail"]["error"]
+
+
+async def test_post_incident_semaphore_locked_returns_503(client: httpx.AsyncClient):
+    with patch("app.routes.incidents._semaphore") as mock_sem:
+        mock_sem.locked.return_value = True
+        resp = await client.post("/api/incidents", data=_F)
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["error"] == "Server at capacity"
+
+
+async def test_post_incident_with_image_emits_image_analysis_event(make_client: Callable):
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock(message=MagicMock(content="Error dialog showing 504"))]
+    mock_mistral = MagicMock()
+    mock_mistral.chat.complete_async = AsyncMock(return_value=mock_resp)
+
+    async with make_client() as c:
+        with patch("app.routes.incidents.get_mistral_client", return_value=mock_mistral):
+            resp = await c.post(
+                "/api/incidents",
+                data=_F,
+                files=[("image", ("error.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png"))],
+            )
+    events = parse_sse(resp.text)
+    assert any(e["event"] == "image_analysis" for e in events)
+    img_event = next(e for e in events if e["event"] == "image_analysis")
+    assert img_event["data"]["count"] == 1
+
+
+async def test_post_incident_with_log_file_includes_log_in_context(make_client: Callable):
+    from app.triage import TriageComplete
+    from tests.conftest import _AsyncIterFromList, _DEFAULT_TRIAGE
+
+    log_content = b"2024-01-01 ERROR NullReferenceException\nstack trace here"
+    triage_mock = MagicMock()
+
+    def _capture_triage(**kwargs: object) -> _AsyncIterFromList:
+        triage_mock(**kwargs)
+        return _AsyncIterFromList([TriageComplete(result=_DEFAULT_TRIAGE)])
+
+    async with make_client() as c:
+        with patch("app.routes.incidents.triage_incident", new=_capture_triage):
+            resp = await c.post(
+                "/api/incidents",
+                data=_F,
+                files=[("log_file", ("app.log", log_content, "text/plain"))],
+            )
+    events = parse_sse(resp.text)
+    assert any(e["event"] == "done" for e in events)
+    call_kwargs = triage_mock.call_args.kwargs
+    assert "NullReferenceException" in call_kwargs.get("attachment_summaries", "")
+
+
+async def test_post_transcribe_semaphore_locked_returns_503(client: httpx.AsyncClient):
+    with patch("app.routes.incidents._semaphore") as mock_sem:
+        mock_sem.locked.return_value = True
+        resp = await client.post(
+            "/api/transcribe",
+            files={"audio": ("rec.wav", _WAV_HEADER, "audio/wav")},
+        )
+    assert resp.status_code == 503
+
+
+async def test_post_incident_image_analysis_failure_emits_error(make_client: Callable):
+    mock_mistral = MagicMock()
+    mock_mistral.chat.complete_async = AsyncMock(
+        side_effect=RuntimeError("Vision API error")
+    )
+
+    async with make_client() as c:
+        with patch("app.routes.incidents.get_mistral_client", return_value=mock_mistral):
+            resp = await c.post(
+                "/api/incidents",
+                data=_F,
+                files=[("image", ("error.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png"))],
+            )
+    events = parse_sse(resp.text)
+    error_events = [e for e in events if e["event"] == "error"]
+    assert any(e["data"]["stage"] == "image_analysis" for e in error_events)

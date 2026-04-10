@@ -14,7 +14,8 @@ def test_title_too_long_raises_400():
             reporter_email="a@b.com",
         )
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail["field"] == "title"  # ty: ignore[invalid-argument-type]
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "title"
 
 
 def test_description_too_long_raises_400():
@@ -27,7 +28,8 @@ def test_description_too_long_raises_400():
             reporter_email="a@b.com",
         )
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail["field"] == "description"  # ty: ignore[invalid-argument-type]
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "description"
 
 
 def test_invalid_category_raises_400():
@@ -40,7 +42,8 @@ def test_invalid_category_raises_400():
             reporter_email="a@b.com",
         )
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail["field"] == "category"  # ty: ignore[invalid-argument-type]
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "category"
 
 
 def test_invalid_email_raises_400():
@@ -53,7 +56,8 @@ def test_invalid_email_raises_400():
             reporter_email="notanemail",
         )
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail["field"] == "reporter_email"  # ty: ignore[invalid-argument-type]
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "reporter_email"
 
 
 def test_valid_fields_pass():
@@ -99,4 +103,70 @@ def test_text_log_accepted():
 def test_oversized_image_raises_413():
     with pytest.raises(HTTPException) as exc_info:
         validate_file_magic(b"\x89PNG" + b"\x00" * (10 * 1024 * 1024 + 1), "big.png")
+    assert exc_info.value.status_code == 413
+
+
+def test_empty_title_raises_400():
+    with pytest.raises(HTTPException) as exc_info:
+        validate_fields(
+            title="   ", description="ok", category="payment",
+            severity_hint="high", reporter_email="",
+        )
+    assert exc_info.value.status_code == 400
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "title"
+
+
+def test_empty_description_raises_400():
+    with pytest.raises(HTTPException) as exc_info:
+        validate_fields(
+            title="ok", description="  ", category="payment",
+            severity_hint="high", reporter_email="",
+        )
+    assert exc_info.value.status_code == 400
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "description"
+
+
+def test_invalid_severity_hint_raises_400():
+    with pytest.raises(HTTPException) as exc_info:
+        validate_fields(
+            title="ok", description="ok", category="payment",
+            severity_hint="bogus", reporter_email="",
+        )
+    assert exc_info.value.status_code == 400
+    assert isinstance(exc_info.value.detail, dict)
+    assert exc_info.value.detail["field"] == "severity_hint"
+
+
+def test_oversized_audio_raises_413():
+    with pytest.raises(HTTPException) as exc_info:
+        validate_file_magic(b"RIFF" + b"\x00" * (25 * 1024 * 1024 + 1), "big.wav")
+    assert exc_info.value.status_code == 413
+
+
+def test_mp4_extension_detected_as_audio():
+    content = b"\x00\x00\x00\x1cftypisom\x00\x00"
+    result = validate_file_magic(content, "recording.m4a")
+    assert result == "audio"
+
+
+def test_oversized_mp4_raises_413():
+    content = b"\x00\x00\x00\x1cftypisom" + b"\x00" * (25 * 1024 * 1024 + 1)
+    with pytest.raises(HTTPException) as exc_info:
+        validate_file_magic(content, "big.m4a")
+    assert exc_info.value.status_code == 413
+
+
+def test_log_invalid_utf8_raises_415():
+    content = b"\x80\x81\x82\x83" * 100
+    with pytest.raises(HTTPException) as exc_info:
+        validate_file_magic(content, "data.log")
+    assert exc_info.value.status_code == 415
+
+
+def test_oversized_log_raises_413():
+    content = b"2024-01-01 log line\n" * 500_000
+    with pytest.raises(HTTPException) as exc_info:
+        validate_file_magic(content, "huge.log")
     assert exc_info.value.status_code == 413

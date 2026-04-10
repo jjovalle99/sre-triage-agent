@@ -87,3 +87,10 @@ async def test_manual_resolve_already_resolved(resolve_client: tuple[httpx.Async
     resp = await client.post(f"/api/incidents/{incident.id}/resolve")
     assert resp.status_code == 200
     assert resp.json()["status"] == "already_resolved"
+
+
+@pytest.mark.asyncio
+async def test_manual_resolve_invalid_uuid_returns_404(resolve_client: tuple[httpx.AsyncClient, Incident]) -> None:
+    client, _ = resolve_client
+    resp = await client.post("/api/incidents/not-a-valid-uuid/resolve")
+    assert resp.status_code == 404

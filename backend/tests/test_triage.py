@@ -263,3 +263,64 @@ async def test_query_error_raises_runtime_error() -> None:
                 eshop_dir="/app/eshop",
             )
         )
+
+
+def test_tool_use_to_event_glob_tool() -> None:
+    from app.triage import _tool_use_to_event
+
+    block = MagicMock()
+    block.name = "Glob"
+    block.input = {"pattern": "src/**/*.cs"}
+    event = _tool_use_to_event(block)
+    assert event.tool == "Glob"
+    assert "src/**/*.cs" in event.action
+
+
+def test_tool_use_to_event_bash_tool() -> None:
+    from app.triage import _tool_use_to_event
+
+    block = MagicMock()
+    block.name = "Bash"
+    block.input = {"command": "ls -la src/PaymentProcessor/"}
+    event = _tool_use_to_event(block)
+    assert event.tool == "Bash"
+    assert "ls -la" in event.action
+
+
+def test_tool_use_to_event_unknown_tool() -> None:
+    from app.triage import _tool_use_to_event
+
+    block = MagicMock()
+    block.name = "SomeUnknownTool"
+    block.input = {}
+    event = _tool_use_to_event(block)
+    assert event.tool == "SomeUnknownTool"
+    assert "Running SomeUnknownTool" in event.action
+
+
+async def test_no_result_message_raises() -> None:
+    from collections.abc import AsyncIterator
+
+    from app.triage import _read_file
+
+    _read_file.cache_clear()
+
+    async def fake_query(**_kw: object) -> AsyncIterator[object]:
+        return
+        yield  # noqa: RET504
+
+    with (
+        patch("app.triage.query", fake_query),
+        pytest.raises(RuntimeError, match="No ResultMessage"),
+    ):
+        await collect_async(
+            triage_incident(
+                title="t",
+                description="d",
+                search_paths=[],
+                affected_services=[],
+                severity="P2",
+                category="other",
+                eshop_dir="/app/eshop",
+            )
+        )

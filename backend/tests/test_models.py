@@ -135,3 +135,25 @@ def test_incident_read_decodes_triage_json_fields():
     assert read.relevant_files == ["src/File.cs"]
     assert read.root_cause_hypothesis == "root cause"
     assert read.confidence == 0.85
+
+
+def test_incident_read_decodes_json_from_dict():
+    data = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "title": "t",
+        "description": "d",
+        "category": "payment",
+        "severity_hint": "high",
+        "reporter_email": "a@b.com",
+        "status": "submitted",
+        "created_at": "2024-01-01T00:00:00",
+        "investigation_steps": '["step1", "step2"]',
+        "relevant_files": '["src/File.cs"]',
+        "affected_services": '["Basket.API"]',
+        "search_paths": '["src/Basket.API/"]',
+    }
+    read = IncidentRead.model_validate(data)
+    assert read.investigation_steps == ["step1", "step2"]
+    assert read.relevant_files == ["src/File.cs"]
+    assert read.affected_services == ["Basket.API"]
+    assert read.search_paths == ["src/Basket.API/"]
